@@ -1,0 +1,46 @@
+version: '3.4'
+
+services:
+  db:
+    container_name: sql_server
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - 8002:1433
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${DB_SA_PASSWORD}
+      - MSSQL_PID=Express
+    restart: always
+    networks:
+      - app_network
+    volumes:
+      - sql_server_data:/var/opt/mssql
+
+  api_service:
+    container_name: my-api-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5000:80
+      - 5001:443
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME}
+      - DB_SA_PASSWORD=${DB_SA_PASSWORD}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    networks:
+      - app_network
+    env_file:
+      - .env
+
+volumes:
+  sql_server_data:
+
+networks:
+  app_network:
+    external: true
