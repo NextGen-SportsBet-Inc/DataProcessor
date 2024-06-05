@@ -5,9 +5,9 @@ using DataProcessorAPI.Models;
 
 namespace DataProcessorAPI.Data;
 
-public class ProcessorDbContext : DbContext
+public class MatchDbContext : DbContext
 {
-    public ProcessorDbContext(DbContextOptions<ProcessorDbContext> options) : base(options)
+    public MatchDbContext(DbContextOptions<MatchDbContext> options) : base(options)
     {
         Database.EnsureCreated();
     }

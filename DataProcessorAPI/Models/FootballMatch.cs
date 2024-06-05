@@ -8,6 +8,8 @@ public class FootballMatch
 {
         [Key]
         public int Id { get; set; } // ID must be a string
+        
+        public required string Time { get; set; } // Time of the match
 
         public required int HomeTeamId { get; set; } // ID for the home team
         

@@ -1,7 +1,5 @@
-using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using DataProcessorAPI.Data;
 using DataProcessorAPI.Models;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +50,6 @@ public class ProcessorBackgroundService : BackgroundService
 
         return footballTeamsDict;
     }
-
 
     public ProcessorBackgroundService(IServiceProvider serviceProvider)
     {
@@ -118,11 +115,12 @@ public class ProcessorBackgroundService : BackgroundService
 
                     using (var scope = _serviceProvider.CreateScope())
                     {
-                        var dbContext = scope.ServiceProvider.GetRequiredService<ProcessorDbContext>();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<MatchDbContext>();
 
                         if (queue == "football_live_odds")
                         {
-                            await FootballOddMessage(message, dbContext);
+                            var matchService = scope.ServiceProvider.GetRequiredService<MatchService>();
+                            await FootballOddMessage(message, dbContext, matchService);
                         }
                         // To add more cases for different queues if necessary
                     }
@@ -137,7 +135,7 @@ public class ProcessorBackgroundService : BackgroundService
         return Task.CompletedTask;
     }
 
-    private async Task FootballOddMessage(string message, ProcessorDbContext dbContext)
+    private async Task FootballOddMessage(string message, MatchDbContext dbContext, MatchService matchService)
     {
         var processedData = new List<FootballMatch>();
 
@@ -191,6 +189,48 @@ public class ProcessorBackgroundService : BackgroundService
                 Console.WriteLine("Odds is null or not found");
                 continue;
             }
+            
+            var fixtureElement = response.GetProperty("fixture");
+            var matchId = fixtureElement.GetProperty("id").GetInt32();
+            var matchStatus = fixtureElement.GetProperty("status").GetProperty("long").GetString();
+
+            if (matchStatus == "Match Finished")
+            {
+                // Verify if the match exists in the database
+                Console.WriteLine($"Match {matchId} has finished");
+                var existingMatch = await dbContext.FootballMatches.FindAsync(matchId);
+                if (existingMatch != null)
+                {
+                    // Determine the winner based on the final score
+                    var teams = response.GetProperty("teams");
+                    var homeGoals = teams.GetProperty("home").GetProperty("goals").GetInt32();
+                    var awayGoals = teams.GetProperty("away").GetProperty("goals").GetInt32();
+
+                    var results = JsonSerializer.Deserialize<Dictionary<string, string>>(existingMatch.ResultOddsJson);
+                    
+                    var winnerId = 0;
+                    var winnerOdd = results!["Draw"];
+                    if (homeGoals > awayGoals)
+                    {
+                        winnerId = existingMatch.HomeTeamId;
+                        winnerOdd = results!["Home"];
+                    }
+                    else if (awayGoals > homeGoals)
+                    {
+                        winnerId = existingMatch.AwayTeamId;
+                        winnerOdd = results!["Away"];
+                    }
+
+                    await matchService.MatchChanged(existingMatch.Id, winnerId, double.Parse(winnerOdd)) ;
+
+                    // Update the existing match with the final score and winner
+                    dbContext.FootballMatches.Remove(existingMatch);
+                    await dbContext.SaveChangesAsync();
+                    Console.WriteLine($"Match {existingMatch.Id} finished and removed from the database.");
+                }
+                continue;
+            }
+            Console.WriteLine($"Match {matchId} is still in progress");
 
             var finalScoreOdds = new Dictionary<string, double>();
             foreach (var odd in oddsElement.EnumerateArray())
@@ -206,6 +246,8 @@ public class ProcessorBackgroundService : BackgroundService
                     }
                 }
             }
+
+            
             
             // If finalScoreOdds is empty, skip the current match
             if (finalScoreOdds.Count == 0)
@@ -213,12 +255,12 @@ public class ProcessorBackgroundService : BackgroundService
                 continue;
             }
             
-
             var resultOdds = CalculateMatchOdds(finalScoreOdds);
 
             var data = new FootballMatch
             {
                 Id = response.GetProperty("fixture").GetProperty("id").GetInt32(),
+                Time = response.GetProperty("fixture").GetProperty("status").GetProperty("seconds").GetString()!,
                 HomeTeamId = homeTeamIdElement.GetInt32(),
                 HomeTeamName = homeTeamName,
                 AwayTeamId = awayTeamIdElement.GetInt32(),
@@ -303,12 +345,11 @@ public class ProcessorBackgroundService : BackgroundService
 
         return new Dictionary<string, double>
         {
-            { "Home Win", homeWinOdd },
-            { "Away Win", awayWinOdd },
+            { "Home", homeWinOdd },
+            { "Away", awayWinOdd },
             { "Draw", drawOdd }
         };
     }
-
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {

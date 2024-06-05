@@ -1,7 +1,6 @@
 namespace Shared.Messages
-
 {
-    public record UserExistsRequest 
+    public record UserExistsRequest
     {
         public string? UserId { get; set; }
     }
@@ -21,7 +20,7 @@ namespace Shared.Messages
     {
         public bool Error { get; set; }
 
-        public float? Amount { get; set; }
+        public double? Amount { get; set; }
 
     }
 
@@ -41,18 +40,21 @@ namespace Shared.Messages
 
     }
 
-    public record ChangeBetStatusRequest
+    public record AddAmountRequest
     {
-        public required string MatchId { get; set; }
+        public string? UserId { get; set; }
 
-        public required string TeamId { get; set; }
+        public double? AmountToAdd { get; set; }
     }
 
-    public record ChangeBetStatusResponse
-    {
-        public required string MatchId { get; set; }
 
-        public required string TeamId { get; set; }
+    public record ChangeBetStatusRequest
+    {
+        public required int MatchId { get; set; }
+
+        public required int TeamId { get; set; }
+
+        public required double Odd { get; set; }
     }
 
 }

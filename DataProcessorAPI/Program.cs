@@ -1,7 +1,10 @@
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using DataProcessorAPI.Data;
+using DataProcessorAPI.Repository;
 using DataProcessorAPI.Services;
+// using Keycloak.AuthServices.Authentication;
+// using Keycloak.AuthServices.Authorization;
 using MassTransit;
 
 namespace DataProcessorAPI
@@ -27,8 +30,20 @@ namespace DataProcessorAPI
             var dbName = Environment.GetEnvironmentVariable("DB_NAME");
             var dbPassword = Environment.GetEnvironmentVariable("DB_SA_PASSWORD");
             var connectionString = $"Data Source={dbHost},8002;Initial Catalog={dbName};User ID=sa;Password={dbPassword};TrustServerCertificate=True;Encrypt=false";
-            builder.Services.AddDbContext<ProcessorDbContext>(options => options.UseSqlServer(connectionString));
+            builder.Services.AddDbContext<MatchDbContext>(options => options.UseSqlServer(connectionString));
+            
+            // builder.Services.AddKeycloakWebApiAuthentication(builder.Configuration);
+            // builder.Services
+            //     .AddAuthorization()
+            //     .AddKeycloakAuthorization(options =>
+            //     {
+            //         options.EnableRolesMapping =
+            //             RolesClaimTransformationSource.ResourceAccess;
+            //         options.RolesResource = $"{builder.Configuration["Keycloak:resource"]}";
+            //     })
+            //     .AddAuthorizationBuilder();
 
+            builder.Services.AddScoped<IMatchRepository, MatchRepository>();
 
             // Add services to the container.
             builder.Services.AddMassTransit(x =>
@@ -47,6 +62,8 @@ namespace DataProcessorAPI
                 });
 
             });
+            
+            builder.Services.AddScoped<MatchService>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
