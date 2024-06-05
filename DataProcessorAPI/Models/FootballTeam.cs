@@ -1,8 +1,9 @@
 namespace DataProcessorAPI.Models;
 
 
-public abstract class FootballTeam(string id, string name)
+// ReSharper disable once ClassNeverInstantiated.Global
+public class FootballTeam(int id, string name)
 {
-    public string Id { get; set; } = id;
+    public int Id { get; set; } = id;
     public string Name { get; set; } = name;
 }

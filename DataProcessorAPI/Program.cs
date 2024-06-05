@@ -2,6 +2,7 @@ using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using DataProcessorAPI.Data;
 using DataProcessorAPI.Services;
+using MassTransit;
 
 namespace DataProcessorAPI
 {
@@ -10,7 +11,13 @@ namespace DataProcessorAPI
         public static void Main(string[] args)
         {
             // Load environment variables from .env file
-            DotNetEnv.Env.Load("../../.env");
+            Env.Load("../.env");
+            var hostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST");
+            if (string.IsNullOrEmpty(hostName))
+            {
+                Console.WriteLine("RABBITMQ_HOST environment variable not set.");
+                return;
+            }
             
             var builder = WebApplication.CreateBuilder(args);
             
@@ -19,11 +26,27 @@ namespace DataProcessorAPI
             var dbHost = Environment.GetEnvironmentVariable("DB_HOST");
             var dbName = Environment.GetEnvironmentVariable("DB_NAME");
             var dbPassword = Environment.GetEnvironmentVariable("DB_SA_PASSWORD");
-            var connectionString = $"Data Source={dbHost};Initial Catalog={dbName};User ID=sa;Password={dbPassword};TrustServerCertificate=True";
+            var connectionString = $"Data Source={dbHost},8002;Initial Catalog={dbName};User ID=sa;Password={dbPassword};TrustServerCertificate=True;Encrypt=false";
             builder.Services.AddDbContext<ProcessorDbContext>(options => options.UseSqlServer(connectionString));
 
 
             // Add services to the container.
+            builder.Services.AddMassTransit(x =>
+            {
+                x.SetKebabCaseEndpointNameFormatter();
+
+                x.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host(new Uri("" + Environment.GetEnvironmentVariable("RabbitMQConnectionURI")), h =>
+                    {
+                        h.Username("" + Environment.GetEnvironmentVariable("RabbitUser"));
+                        h.Password("" + Environment.GetEnvironmentVariable("RabbitPassword"));
+                    });
+
+                    cfg.ConfigureEndpoints(context);
+                });
+
+            });
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
