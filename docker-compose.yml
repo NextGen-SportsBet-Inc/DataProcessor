@@ -1,12 +1,15 @@
+version: '3.4'
+
 services:
   processor_db:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: processor_db_container
     ports:
       - 8002:1433
     environment:
       ACCEPT_EULA: Y
       SA_PASSWORD: ${DB_SA_PASSWORD}
-      # - MSSQL_PID=Express
+      MSSQL_PID: Express
     volumes:
       - sql_server_data:/var/opt/mssql
     healthcheck:
@@ -15,13 +18,21 @@ services:
       timeout: 10s
       retries: 3
     restart: always
+    networks:
+     - betting-microservice
+    env_file:
+     - .env
 
-  api_service:
+  dataprocessorapi:
+    image: ${DOCKER_REGISTRY-}dataprocessorapi
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: DataProcessorAPI/Dockerfile
+    networks:
+      - microservice-network
+      - betting-microservice  
     ports:
-      - 5050:80
+      - 5050:5050
     depends_on:
       processor_db:
         condition: service_healthy
@@ -32,7 +43,14 @@ services:
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - RABBITMQ_USER=${RABBITMQ_USER}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    env_file:
+     - .env
 
 volumes:
   sql_server_data:
     driver: local
+
+networks:
+  microservice-network:
+    external: true
+  betting-microservice:
