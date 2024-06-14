@@ -1,2 +1,2 @@
 # DataProcessor
-Microservice responsible for the collected data management
+Microservice responsible for the collected data management.
